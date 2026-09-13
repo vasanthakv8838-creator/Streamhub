@@ -1,0 +1,7 @@
+{
+  "name": "OTT Aggregator",
+  "description": "Unified OTT aggregator merging YouTube, JioHotstar, Apple TV+, Netflix, ZEE5, Sony LIV, and Prime Video with AI video analysis & voice discovery.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
