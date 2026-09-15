@@ -3,6 +3,7 @@ package com.example.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.data.repository.GlobalSearchRepository
 import com.example.data.repository.MockSearchRepository
 import com.example.data.repository.SearchRepository
 import com.example.model.MediaItem
@@ -40,7 +41,7 @@ sealed interface SearchUiState {
 }
 
 class SearchViewModel(
-  private val repository: SearchRepository = MockSearchRepository(),
+  private val repository: SearchRepository = GlobalSearchRepository(),
   private val defaultDebounceMillis: Long = 0L
 ) : ViewModel() {
 

@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.example.data.repository.GlobalSearchRepository
 import com.example.data.repository.MockSearchRepository
 import com.example.data.repository.SearchRepository
 import com.example.model.MediaItem
@@ -87,12 +88,12 @@ import com.example.viewmodel.SearchUiState
 import com.example.viewmodel.SearchViewModel
 
 /**
- * Stateful Search Screen component integrated with [SearchRepository] / [MockSearchRepository].
+ * Stateful Search Screen component integrated with [SearchRepository] / [GlobalSearchRepository].
  */
 @Composable
 fun SearchScreen(
   modifier: Modifier = Modifier,
-  repository: SearchRepository = remember { MockSearchRepository() },
+  repository: SearchRepository = remember { GlobalSearchRepository() },
   viewModel: SearchViewModel = viewModel(factory = SearchViewModel.provideFactory(repository)),
   onItemClick: (MediaItem) -> Unit = {},
   onWatchlistToggle: (MediaItem) -> Unit = {},

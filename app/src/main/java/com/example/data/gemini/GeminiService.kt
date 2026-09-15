@@ -2,6 +2,9 @@ package com.example.data.gemini
 
 import android.util.Log
 import com.example.BuildConfig
+import com.example.model.MediaItem
+import com.example.model.MediaType
+import com.example.model.OttPlatform
 import com.example.model.VideoAnalysisResult
 import com.example.model.VoiceConversationMessage
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +15,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 class GeminiService {
@@ -298,4 +302,343 @@ class GeminiService {
       )
     }
   }
+
+  /**
+   * Universal Live Catalog Discovery using model 'gemini-3.5-flash'.
+   * Searches the entire universe of global movies, series, and videos across all 7 streaming networks.
+   */
+  suspend fun searchGlobalTitlesWithAi(
+    query: String,
+    platformFilter: OttPlatform = OttPlatform.ALL
+  ): List<MediaItem> = withContext(Dispatchers.IO) {
+    val apiKey = BuildConfig.GEMINI_API_KEY
+    if (apiKey.isNullOrBlank() || apiKey == "MY_GEMINI_API_KEY") {
+      return@withContext getLocalAiCatalogFallback(query, platformFilter)
+    }
+
+    try {
+      val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$apiKey"
+      val prompt = """
+        You are the global catalog indexer for 'OTT Aggregator', which consolidates libraries from 7 major streaming networks:
+        NETFLIX, PRIME_VIDEO, JIO_HOTSTAR, APPLE_TV, SONY_LIV, ZEE5, and YOUTUBE.
+        The user is searching for: "$query"
+        Target platform filter: "${platformFilter.name}"
+
+        Find up to 8 real, accurate movies, series, or video shows matching this query from global entertainment.
+        Return ONLY a JSON array with this schema:
+        [
+          {
+            "title": "Exact Title",
+            "platform": "NETFLIX" | "PRIME_VIDEO" | "JIO_HOTSTAR" | "APPLE_TV" | "SONY_LIV" | "ZEE5" | "YOUTUBE",
+            "mediaType": "MOVIE" | "SERIES" | "DOCUMENTARY" | "NEWS" | "SPORTS",
+            "genre": "Genre • Genre2",
+            "rating": 8.4,
+            "votes": "1.2M",
+            "year": 2023,
+            "duration": "2h 15m" or "3 Seasons",
+            "synopsis": "Overview of plot...",
+            "cast": ["Actor 1", "Actor 2"],
+            "director": "Director Name",
+            "posterUrl": "optional URL or empty",
+            "qualityBadge": "4K Ultra HD • HDR10+",
+            "contentAdvisory": "U/A 16+"
+          }
+        ]
+      """.trimIndent()
+
+      val rootJson = JSONObject()
+      val contentsArray = JSONArray()
+      val userObj = JSONObject()
+      userObj.put("role", "user")
+      val partsArr = JSONArray()
+      partsArr.put(JSONObject().put("text", prompt))
+      userObj.put("parts", partsArr)
+      contentsArray.put(userObj)
+      rootJson.put("contents", contentsArray)
+
+      val genConfig = JSONObject()
+      genConfig.put("responseMimeType", "application/json")
+      rootJson.put("generationConfig", genConfig)
+
+      val requestBody = rootJson.toString().toRequestBody(jsonMediaType)
+      val request = Request.Builder().url(url).post(requestBody).build()
+
+      client.newCall(request).execute().use { response ->
+        if (!response.isSuccessful) {
+          Log.w("GeminiService", "AI search failed: ${response.code}")
+          return@withContext getLocalAiCatalogFallback(query, platformFilter)
+        }
+
+        val resString = response.body?.string() ?: ""
+        val resJson = JSONObject(resString)
+        val candidates = resJson.optJSONArray("candidates")
+        val firstCandidate = candidates?.optJSONObject(0)
+        val content = firstCandidate?.optJSONObject("content")
+        val parts = content?.optJSONArray("parts")
+        val replyText = parts?.optJSONObject(0)?.optString("text") ?: ""
+
+        val parsed = parseMediaItemsFromJson(replyText, platformFilter)
+        if (parsed.isNotEmpty()) parsed else getLocalAiCatalogFallback(query, platformFilter)
+      }
+    } catch (e: Exception) {
+      Log.e("GeminiService", "Exception in AI catalog search", e)
+      getLocalAiCatalogFallback(query, platformFilter)
+    }
+  }
+
+  private fun parseMediaItemsFromJson(jsonString: String, targetPlatform: OttPlatform): List<MediaItem> {
+    return try {
+      val trimmed = jsonString.trim()
+      val jsonArray = if (trimmed.startsWith("[")) {
+        JSONArray(trimmed)
+      } else {
+        val start = trimmed.indexOf('[')
+        val end = trimmed.lastIndexOf(']')
+        if (start != -1 && end != -1 && end > start) {
+          JSONArray(trimmed.substring(start, end + 1))
+        } else {
+          return emptyList()
+        }
+      }
+
+      val items = mutableListOf<MediaItem>()
+      for (i in 0 until jsonArray.length()) {
+        val obj = jsonArray.optJSONObject(i) ?: continue
+        val title = obj.optString("title", "").trim()
+        if (title.isBlank()) continue
+
+        val rawPlatform = obj.optString("platform", "")
+        val platform = resolvePlatform(rawPlatform, targetPlatform)
+
+        val rawMediaType = obj.optString("mediaType", "MOVIE")
+        val mediaType = try {
+          MediaType.valueOf(rawMediaType.uppercase())
+        } catch (_: Exception) {
+          if (rawMediaType.contains("series", ignoreCase = true)) MediaType.SERIES else MediaType.MOVIE
+        }
+
+        val genre = obj.optString("genre", "Cinema • Streaming")
+        val rating = obj.optDouble("rating", 8.0)
+        val votes = obj.optString("votes", "850K")
+        val year = obj.optInt("year", 2024)
+        val duration = obj.optString("duration", if (mediaType == MediaType.SERIES) "Multi-Season" else "2h 10m")
+        val synopsis = obj.optString("synopsis", "Streaming globally on ${platform.displayName}.")
+        
+        val castArray = obj.optJSONArray("cast")
+        val castList = mutableListOf<String>()
+        if (castArray != null) {
+          for (c in 0 until castArray.length()) {
+            castList.add(castArray.optString(c))
+          }
+        }
+        if (castList.isEmpty()) castList.add("Ensemble Cast")
+
+        val director = obj.optString("director", "Visionary Director")
+        val givenPoster = obj.optString("posterUrl", "")
+        val posterUrl = if (givenPoster.isNotBlank() && givenPoster.startsWith("http")) {
+          givenPoster
+        } else {
+          getFallbackPosterForPlatform(platform)
+        }
+
+        val qualityBadge = obj.optString("qualityBadge", "4K Ultra HD • Dolby Atmos")
+        val contentAdvisory = obj.optString("contentAdvisory", "U/A 16+")
+
+        val encodedTitle = URLEncoder.encode(title, "UTF-8")
+        val watchUrl = when (platform) {
+          OttPlatform.NETFLIX -> "https://www.netflix.com/search?q=$encodedTitle"
+          OttPlatform.PRIME_VIDEO -> "https://www.primevideo.com/search/ref=atv_nb_sr?phrase=$encodedTitle"
+          OttPlatform.JIO_HOTSTAR -> "https://www.hotstar.com/in/explore?search_query=$encodedTitle"
+          OttPlatform.APPLE_TV -> "https://tv.apple.com/search?term=$encodedTitle"
+          OttPlatform.SONY_LIV -> "https://www.sonyliv.com/search/$encodedTitle"
+          OttPlatform.ZEE5 -> "https://www.zee5.com/search?q=$encodedTitle"
+          OttPlatform.YOUTUBE -> "https://www.youtube.com/results?search_query=$encodedTitle"
+          OttPlatform.ALL -> "https://www.google.com/search?q=watch+$encodedTitle+online"
+        }
+
+        items.add(
+          MediaItem(
+            id = "ai_${platform.name.lowercase()}_${title.lowercase().replace("[^a-z0-9]".toRegex(), "_")}",
+            title = title,
+            platform = platform,
+            mediaType = mediaType,
+            genre = genre,
+            rating = rating,
+            votes = votes,
+            year = year,
+            duration = duration,
+            synopsis = synopsis,
+            cast = castList,
+            director = director,
+            posterUrl = posterUrl,
+            backdropUrl = posterUrl,
+            trailerUrl = "https://www.youtube.com/results?search_query=${URLEncoder.encode("$title trailer", "UTF-8")}",
+            watchUrl = watchUrl,
+            qualityBadge = qualityBadge,
+            contentAdvisory = contentAdvisory,
+            isTrending = rating >= 8.2
+          )
+        )
+      }
+
+      if (targetPlatform != OttPlatform.ALL) {
+        items.filter { it.platform == targetPlatform }
+      } else {
+        items
+      }
+    } catch (e: Exception) {
+      Log.e("GeminiService", "Failed parsing media items JSON", e)
+      emptyList()
+    }
+  }
+
+  private fun resolvePlatform(raw: String, targetPlatform: OttPlatform): OttPlatform {
+    if (targetPlatform != OttPlatform.ALL) return targetPlatform
+    val upper = raw.uppercase()
+    return when {
+      upper.contains("NETFLIX") -> OttPlatform.NETFLIX
+      upper.contains("PRIME") || upper.contains("AMAZON") -> OttPlatform.PRIME_VIDEO
+      upper.contains("HOTSTAR") || upper.contains("DISNEY") || upper.contains("JIO") -> OttPlatform.JIO_HOTSTAR
+      upper.contains("APPLE") -> OttPlatform.APPLE_TV
+      upper.contains("SONY") || upper.contains("LIV") -> OttPlatform.SONY_LIV
+      upper.contains("ZEE") -> OttPlatform.ZEE5
+      upper.contains("YOUTUBE") -> OttPlatform.YOUTUBE
+      else -> OttPlatform.NETFLIX
+    }
+  }
+
+  private fun getFallbackPosterForPlatform(platform: OttPlatform): String {
+    return when (platform) {
+      OttPlatform.NETFLIX -> "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=600&auto=format&fit=crop&q=80"
+      OttPlatform.PRIME_VIDEO -> "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=600&auto=format&fit=crop&q=80"
+      OttPlatform.JIO_HOTSTAR -> "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80"
+      OttPlatform.APPLE_TV -> "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&auto=format&fit=crop&q=80"
+      OttPlatform.SONY_LIV -> "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80"
+      OttPlatform.ZEE5 -> "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=600&auto=format&fit=crop&q=80"
+      OttPlatform.YOUTUBE -> "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=600&auto=format&fit=crop&q=80"
+      OttPlatform.ALL -> "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80"
+    }
+  }
+
+  private fun getLocalAiCatalogFallback(query: String, platformFilter: OttPlatform): List<MediaItem> {
+    val q = query.lowercase().trim()
+    val allFallback = listOf(
+      MediaItem(
+        id = "ai_dune_2",
+        title = "Dune: Part Two",
+        platform = OttPlatform.JIO_HOTSTAR,
+        mediaType = MediaType.MOVIE,
+        genre = "Sci-Fi • Epic Adventure",
+        rating = 8.6,
+        votes = "540K",
+        year = 2024,
+        duration = "2h 46m",
+        synopsis = "Paul Atreides unites with Chani and the Fremen while seeking revenge against the conspirators who destroyed his family.",
+        cast = listOf("Timothée Chalamet", "Zendaya", "Rebecca Ferguson", "Javier Bardem"),
+        director = "Denis Villeneuve",
+        posterUrl = "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600&auto=format&fit=crop&q=80",
+        backdropUrl = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80",
+        trailerUrl = "https://www.youtube.com/watch?v=Way9Dexny3w",
+        watchUrl = "https://www.hotstar.com/in/explore?search_query=Dune+Part+Two",
+        qualityBadge = "IMAX Enhanced • Dolby Atmos",
+        isTrending = true
+      ),
+      MediaItem(
+        id = "ai_oppenheimer",
+        title = "Oppenheimer",
+        platform = OttPlatform.JIO_HOTSTAR,
+        mediaType = MediaType.MOVIE,
+        genre = "Biographical Drama • History",
+        rating = 8.9,
+        votes = "780K",
+        year = 2023,
+        duration = "3h 00m",
+        synopsis = "The story of American scientist J. Robert Oppenheimer and his role in the development of the atomic bomb during World War II.",
+        cast = listOf("Cillian Murphy", "Emily Blunt", "Matt Damon", "Robert Downey Jr."),
+        director = "Christopher Nolan",
+        posterUrl = "https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=600&auto=format&fit=crop&q=80",
+        backdropUrl = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1200&auto=format&fit=crop&q=80",
+        trailerUrl = "https://www.youtube.com/watch?v=uYPbbksJxIg",
+        watchUrl = "https://www.hotstar.com/in/explore?search_query=Oppenheimer",
+        qualityBadge = "4K Dolby Vision • Atmos",
+        isTrending = true
+      ),
+      MediaItem(
+        id = "ai_interstellar",
+        title = "Interstellar",
+        platform = OttPlatform.PRIME_VIDEO,
+        mediaType = MediaType.MOVIE,
+        genre = "Sci-Fi • Space Adventure",
+        rating = 8.7,
+        votes = "2.1M",
+        year = 2014,
+        duration = "2h 49m",
+        synopsis = "A team of explorers travel through a wormhole in space in an attempt to ensure humanity's survival.",
+        cast = listOf("Matthew McConaughey", "Anne Hathaway", "Jessica Chastain"),
+        director = "Christopher Nolan",
+        posterUrl = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop&q=80",
+        backdropUrl = "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=1200&auto=format&fit=crop&q=80",
+        trailerUrl = "https://www.youtube.com/watch?v=zSWdZVtXT7E",
+        watchUrl = "https://www.primevideo.com/search/ref=atv_nb_sr?phrase=Interstellar",
+        qualityBadge = "4K Ultra HD",
+        isTrending = true
+      ),
+      MediaItem(
+        id = "ai_breaking_bad",
+        title = "Breaking Bad",
+        platform = OttPlatform.NETFLIX,
+        mediaType = MediaType.SERIES,
+        genre = "Crime • Drama • Suspense",
+        rating = 9.5,
+        votes = "2.2M",
+        year = 2013,
+        duration = "5 Seasons (62 Eps)",
+        synopsis = "A chemistry teacher diagnosed with cancer turns to manufacturing methamphetamine to secure his family's future.",
+        cast = listOf("Bryan Cranston", "Aaron Paul", "Anna Gunn", "Giancarlo Esposito"),
+        director = "Vince Gilligan",
+        posterUrl = "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&auto=format&fit=crop&q=80",
+        backdropUrl = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80",
+        trailerUrl = "https://www.youtube.com/watch?v=HhesaQXLuRY",
+        watchUrl = "https://www.netflix.com/search?q=Breaking+Bad",
+        qualityBadge = "4K Ultra HD • 5.1 Audio",
+        isTrending = true
+      ),
+      MediaItem(
+        id = "ai_dark_knight",
+        title = "The Dark Knight",
+        platform = OttPlatform.NETFLIX,
+        mediaType = MediaType.MOVIE,
+        genre = "Action • Crime • Drama",
+        rating = 9.0,
+        votes = "2.9M",
+        year = 2008,
+        duration = "2h 32m",
+        synopsis = "When the menace known as the Joker wreaks havoc and chaos on Gotham City, Batman must accept one of the greatest tests.",
+        cast = listOf("Christian Bale", "Heath Ledger", "Aaron Eckhart", "Michael Caine"),
+        director = "Christopher Nolan",
+        posterUrl = "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&auto=format&fit=crop&q=80",
+        backdropUrl = "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=1200&auto=format&fit=crop&q=80",
+        trailerUrl = "https://www.youtube.com/watch?v=EXeTwQWrcwY",
+        watchUrl = "https://www.netflix.com/search?q=The+Dark+Knight",
+        qualityBadge = "4K Dolby Vision",
+        isTrending = true
+      )
+    )
+
+    val matched = allFallback.filter { item ->
+      (platformFilter == OttPlatform.ALL || item.platform == platformFilter) &&
+          (item.title.lowercase().contains(q) ||
+              item.genre.lowercase().contains(q) ||
+              item.cast.any { it.lowercase().contains(q) } ||
+              item.director.lowercase().contains(q) ||
+              q.contains(item.title.lowercase()))
+    }
+
+    if (matched.isNotEmpty()) {
+      return matched
+    }
+
+    return emptyList()
+  }
 }
+
