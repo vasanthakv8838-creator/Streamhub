@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -31,6 +32,8 @@ import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Mic
@@ -48,6 +51,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -57,13 +61,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import coil.compose.AsyncImage
+import com.example.data.LiveTvCatalog
+import com.example.data.RegionalCatalog
+import com.example.model.CuratedTrailer
+import com.example.model.LiveChannel
 import com.example.model.MediaItem
 import com.example.model.OttPlatform
 import com.example.model.StreamProfile
 import com.example.model.UserProfile
+import com.example.model.VpnConnectionState
+import com.example.model.VpnStatus
 import com.example.ui.auth.LoginScreen
 import com.example.ui.auth.ProfileSelectionScreen
 import com.example.ui.components.FeaturedHeroBanner
+import com.example.ui.components.LiveTvView
 import com.example.ui.components.MediaCard
 import com.example.ui.components.MediaDetailBottomSheet
 import com.example.ui.components.MediaTypeChipsRow
@@ -71,6 +86,7 @@ import com.example.ui.components.OttHeader
 import com.example.ui.components.PlatformPlansSheet
 import com.example.ui.components.PlatformSelectorRow
 import com.example.ui.components.SearchScreen
+import com.example.ui.components.SurfsharkVpnView
 import com.example.ui.components.UserProfileSheet
 import com.example.ui.components.VideoAnalyzerView
 import com.example.ui.components.VoiceAssistantView
@@ -144,10 +160,18 @@ fun MainScreen(
 
   // Video Analyzer states
   val selectedTrailer by viewModel.selectedTrailer.collectAsState()
+  val availableTrailers by viewModel.availableTrailers.collectAsState()
   val customVideoUrl by viewModel.customVideoUrl.collectAsState()
   val customVideoTitle by viewModel.customVideoTitle.collectAsState()
   val videoAnalysisResult by viewModel.videoAnalysisResult.collectAsState()
   val isVideoAnalyzing by viewModel.isVideoAnalyzing.collectAsState()
+
+  // Surfshark VPN & Live TV states
+  val vpnState by viewModel.vpnState.collectAsState()
+  val availableVpnServers = viewModel.availableVpnServers
+  val liveChannels by viewModel.liveChannels.collectAsState()
+  val selectedLiveCategory by viewModel.selectedLiveCategory.collectAsState()
+  val liveSearchQuery by viewModel.liveSearchQuery.collectAsState()
 
   val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
   val profileSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -190,7 +214,53 @@ fun MainScreen(
           onClick = { viewModel.selectTab(1) },
           icon = {
             Icon(
-              imageVector = if (selectedTab == 1) Icons.Filled.Search else Icons.Outlined.Search,
+              imageVector = Icons.Filled.Tv,
+              contentDescription = "Live TV"
+            )
+          },
+          label = { Text("Live TV", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
+          colors = NavigationBarItemDefaults.colors(
+            selectedIconColor = Color(0xFFE50914),
+            selectedTextColor = Color(0xFFE50914),
+            indicatorColor = SurfaceElevated,
+            unselectedIconColor = Color(0xFFA0A7B8),
+            unselectedTextColor = Color(0xFFA0A7B8)
+          ),
+          modifier = Modifier.testTag("tab_live_tv")
+        )
+
+        NavigationBarItem(
+          selected = selectedTab == 2,
+          onClick = { viewModel.selectTab(2) },
+          icon = {
+            Icon(
+              imageVector = Icons.Filled.Security,
+              contentDescription = "Surfshark VPN"
+            )
+          },
+          label = {
+            Text(
+              if (vpnState.status == VpnStatus.CONNECTED) "${vpnState.server.flagEmoji} VPN" else "VPN",
+              fontSize = 11.sp,
+              fontWeight = FontWeight.SemiBold
+            )
+          },
+          colors = NavigationBarItemDefaults.colors(
+            selectedIconColor = Color(0xFF00D1B2),
+            selectedTextColor = Color(0xFF00D1B2),
+            indicatorColor = SurfaceElevated,
+            unselectedIconColor = if (vpnState.status == VpnStatus.CONNECTED) Color(0xFF00D1B2) else Color(0xFFA0A7B8),
+            unselectedTextColor = if (vpnState.status == VpnStatus.CONNECTED) Color(0xFF00D1B2) else Color(0xFFA0A7B8)
+          ),
+          modifier = Modifier.testTag("tab_surfshark_vpn")
+        )
+
+        NavigationBarItem(
+          selected = selectedTab == 3,
+          onClick = { viewModel.selectTab(3) },
+          icon = {
+            Icon(
+              imageVector = if (selectedTab == 3) Icons.Filled.Search else Icons.Outlined.Search,
               contentDescription = "Search"
             )
           },
@@ -206,11 +276,11 @@ fun MainScreen(
         )
 
         NavigationBarItem(
-          selected = selectedTab == 2,
-          onClick = { viewModel.selectTab(2) },
+          selected = selectedTab == 4,
+          onClick = { viewModel.selectTab(4) },
           icon = {
             Icon(
-              imageVector = if (selectedTab == 2) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
+              imageVector = if (selectedTab == 4) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
               contentDescription = "Watchlist"
             )
           },
@@ -223,46 +293,6 @@ fun MainScreen(
             unselectedTextColor = Color(0xFFA0A7B8)
           ),
           modifier = Modifier.testTag("tab_watchlist")
-        )
-
-        NavigationBarItem(
-          selected = selectedTab == 3,
-          onClick = { viewModel.selectTab(3) },
-          icon = {
-            Icon(
-              imageVector = if (selectedTab == 3) Icons.Filled.Mic else Icons.Outlined.Mic,
-              contentDescription = "Voice AI"
-            )
-          },
-          label = { Text("Live Voice", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
-          colors = NavigationBarItemDefaults.colors(
-            selectedIconColor = AccentCyan,
-            selectedTextColor = AccentCyan,
-            indicatorColor = SurfaceElevated,
-            unselectedIconColor = Color(0xFFA0A7B8),
-            unselectedTextColor = Color(0xFFA0A7B8)
-          ),
-          modifier = Modifier.testTag("tab_voice_ai")
-        )
-
-        NavigationBarItem(
-          selected = selectedTab == 4,
-          onClick = { viewModel.selectTab(4) },
-          icon = {
-            Icon(
-              imageVector = if (selectedTab == 4) Icons.Filled.VideoLibrary else Icons.Outlined.VideoLibrary,
-              contentDescription = "Video Pro"
-            )
-          },
-          label = { Text("Video Pro", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
-          colors = NavigationBarItemDefaults.colors(
-            selectedIconColor = Color(0xFFC084FC),
-            selectedTextColor = Color(0xFFC084FC),
-            indicatorColor = SurfaceElevated,
-            unselectedIconColor = Color(0xFFA0A7B8),
-            unselectedTextColor = Color(0xFFA0A7B8)
-          ),
-          modifier = Modifier.testTag("tab_video_analyzer")
         )
       }
     }
@@ -286,19 +316,51 @@ fun MainScreen(
             watchlistIds = watchlistIds,
             onItemClick = { viewModel.openMediaDetails(it) },
             onWatchlistToggle = { viewModel.toggleWatchlist(it) },
-            onVoiceShortcut = { viewModel.selectTab(3) },
-            onVideoAnalyzerShortcut = { viewModel.selectTab(4) },
+            onVoiceShortcut = { viewModel.selectTab(5) },
+            onVideoAnalyzerShortcut = { viewModel.selectTab(6) },
+            onVpnShortcut = { viewModel.selectTab(2) },
+            onLiveTvShortcut = { viewModel.selectTab(1) },
             onWatchDirect = { item ->
               launchUrl(context, item.watchUrl)
             },
             userProfile = currentUser,
             activeProfile = activeProfile,
+            vpnState = vpnState,
             onProfileClick = { viewModel.showProfileSheet() },
-            onPlansClick = { viewModel.showPlansSheet() }
+            onPlansClick = { viewModel.showPlansSheet() },
+            onChannelClick = { viewModel.openCountryLiveChannel(it) },
+            onVideoClick = { viewModel.openTrailer(it) }
           )
         }
         1 -> {
-          // Dedicated Search Screen component integrated with MockSearchRepository for testing UI flow
+          // Dedicated Live TV section with 24/7 channels across News, Sports, Entertainment, Movies & EPG
+          LiveTvView(
+            channels = liveChannels,
+            selectedCategory = selectedLiveCategory,
+            onSelectCategory = { viewModel.selectLiveCategory(it) },
+            searchQuery = liveSearchQuery,
+            onSearchQueryChanged = { viewModel.setLiveSearchQuery(it) },
+            vpnState = vpnState,
+            onOpenVpnSettings = { viewModel.selectTab(2) }
+          )
+        }
+        2 -> {
+          // Built-in Surfshark VPN & Location Manager
+          SurfsharkVpnView(
+            vpnState = vpnState,
+            availableServers = availableVpnServers,
+            onConnect = { viewModel.connectVpn() },
+            onDisconnect = { viewModel.disconnectVpn() },
+            onSelectServer = { viewModel.switchVpnServer(it) },
+            onToggleCleanWeb = { viewModel.toggleCleanWeb() },
+            onToggleKillSwitch = { viewModel.toggleKillSwitch() },
+            onMediaClick = { viewModel.openMediaDetails(it) },
+            onChannelClick = { viewModel.openCountryLiveChannel(it) },
+            onVideoClick = { viewModel.openTrailer(it) }
+          )
+        }
+        3 -> {
+          // Dedicated Search Screen component integrated with MockSearchRepository
           SearchScreen(
             onItemClick = { viewModel.openMediaDetails(it) },
             onWatchlistToggle = { viewModel.toggleWatchlist(it) },
@@ -306,7 +368,7 @@ fun MainScreen(
             isVip = currentUser?.isVip == true
           )
         }
-        2 -> {
+        4 -> {
           // Cross-platform Room Database Watchlist
           WatchlistView(
             watchlist = watchlistItems,
@@ -315,7 +377,7 @@ fun MainScreen(
             onExploreClick = { viewModel.selectTab(0) }
           )
         }
-        3 -> {
+        5 -> {
           // Live Conversational Voice Assistant (gemini-3.1-flash-live-preview)
           VoiceAssistantView(
             messages = voiceMessages,
@@ -326,7 +388,7 @@ fun MainScreen(
             onStopSpeaking = { viewModel.stopSpeaking() }
           )
         }
-        4 -> {
+        6 -> {
           // Video Content Analyzer (gemini-3.1-pro-preview)
           VideoAnalyzerView(
             selectedTrailer = selectedTrailer,
@@ -337,7 +399,8 @@ fun MainScreen(
             onSelectTrailer = { viewModel.selectTrailer(it) },
             onSetCustomUrl = { viewModel.setCustomVideoUrl(it) },
             onSetCustomTitle = { viewModel.setCustomVideoTitle(it) },
-            onAnalyze = { prompt -> viewModel.analyzeCurrentVideo(prompt) }
+            onAnalyze = { prompt -> viewModel.analyzeCurrentVideo(prompt) },
+            availableTrailers = availableTrailers
           )
         }
       }
@@ -411,17 +474,30 @@ fun ExploreFeedView(
   onWatchlistToggle: (MediaItem) -> Unit,
   onVoiceShortcut: () -> Unit,
   onVideoAnalyzerShortcut: () -> Unit,
+  onVpnShortcut: () -> Unit = {},
+  onLiveTvShortcut: () -> Unit = {},
   onWatchDirect: (MediaItem) -> Unit,
   userProfile: UserProfile? = null,
   activeProfile: StreamProfile? = null,
+  vpnState: VpnConnectionState? = null,
   onProfileClick: () -> Unit = {},
-  onPlansClick: () -> Unit = {}
+  onPlansClick: () -> Unit = {},
+  onChannelClick: (LiveChannel) -> Unit = {},
+  onVideoClick: (CuratedTrailer) -> Unit = {}
 ) {
   val heroItem = items.firstOrNull { it.isFeaturedHero } ?: items.firstOrNull()
   val trendingList = items.filter { it.isTrending }
   val allPlatformList = items
 
   val isVip = userProfile?.isVip == true
+
+  val connectedCountryCode = if (vpnState?.status == VpnStatus.CONNECTED) vpnState.server.countryCode else null
+  val countryLiveChannels = remember(connectedCountryCode) {
+    if (connectedCountryCode != null) LiveTvCatalog.getChannelsForRegion(connectedCountryCode) else emptyList()
+  }
+  val countryVideos = remember(connectedCountryCode) {
+    if (connectedCountryCode != null) RegionalCatalog.getVideosForRegion(connectedCountryCode) else emptyList()
+  }
 
   LazyColumn(
     modifier = Modifier.fillMaxSize(),
@@ -436,8 +512,10 @@ fun ExploreFeedView(
         onVideoAnalyzerClick = onVideoAnalyzerShortcut,
         userProfile = userProfile,
         activeProfile = activeProfile,
+        vpnState = vpnState,
         onProfileClick = onProfileClick,
-        onPlansClick = onPlansClick
+        onPlansClick = onPlansClick,
+        onVpnClick = onVpnShortcut
       )
     }
 
@@ -455,6 +533,440 @@ fun ExploreFeedView(
         selectedType = selectedMediaType,
         onTypeSelected = onMediaTypeSelected
       )
+    }
+
+    // Surfshark VPN Regional Connection Banner
+    item {
+      val isVpnConnected = vpnState?.status == VpnStatus.CONNECTED
+      androidx.compose.material3.Surface(
+        onClick = onVpnShortcut,
+        shape = RoundedCornerShape(14.dp),
+        color = if (isVpnConnected) Color(0xFF172836) else SurfaceElevated,
+        border = androidx.compose.foundation.BorderStroke(
+          1.dp,
+          if (isVpnConnected) Color(0xFF00D1B2) else BorderSubtle
+        ),
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(horizontal = 16.dp, vertical = 4.dp)
+          .testTag("explore_vpn_banner")
+      ) {
+        Row(
+          modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+          ) {
+            Text(
+              text = if (isVpnConnected && vpnState != null) vpnState.server.flagEmoji else "🛡️",
+              fontSize = 22.sp
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                  text = if (isVpnConnected && vpnState != null) {
+                    "Surfshark: ${vpnState.server.countryName} (${vpnState.server.city})"
+                  } else {
+                    "Surfshark VPN: Global Catalog"
+                  },
+                  fontSize = 12.sp,
+                  fontWeight = FontWeight.Bold,
+                  color = if (isVpnConnected) Color(0xFF00D1B2) else Color.White
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Box(
+                  modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(
+                      if (isVpnConnected) Color(0xFF0A4F48) else SurfaceDark
+                    )
+                    .padding(horizontal = 5.dp, vertical = 1.dp)
+                ) {
+                  Text(
+                    text = if (isVpnConnected) "CONNECTED" else "DISCONNECTED",
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (isVpnConnected) Color(0xFF00D1B2) else Color(0xFFA0A7B8)
+                  )
+                }
+              }
+              Text(
+                text = if (isVpnConnected && vpnState != null) {
+                  "Streaming ${vpnState.server.catalogDescription} • Tap to change location"
+                } else {
+                  "Change location to unlock region-exclusive movies, shows & Live TV"
+                },
+                fontSize = 10.sp,
+                color = Color(0xFFA0A7B8),
+                maxLines = 1
+              )
+            }
+          }
+
+          Text(
+            text = if (isVpnConnected) "CHANGE" else "CONNECT",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = Color(0xFF00D1B2)
+          )
+        }
+      }
+    }
+
+    // Dedicated Live TV Carousel Shortcut Banner
+    if (searchQuery.isBlank() && selectedPlatform == OttPlatform.ALL) {
+      item {
+        androidx.compose.material3.Surface(
+          onClick = onLiveTvShortcut,
+          shape = RoundedCornerShape(14.dp),
+          color = Color(0xFF221115),
+          border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE50914).copy(alpha = 0.5f)),
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .testTag("explore_live_tv_banner")
+        ) {
+          Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+          ) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              modifier = Modifier.weight(1f)
+            ) {
+              Box(
+                modifier = Modifier
+                  .size(32.dp)
+                  .clip(RoundedCornerShape(8.dp))
+                  .background(Color(0xFFE50914)),
+                contentAlignment = Alignment.Center
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Tv,
+                  contentDescription = "Live TV",
+                  tint = Color.White,
+                  modifier = Modifier.size(18.dp)
+                )
+              }
+              Spacer(modifier = Modifier.width(10.dp))
+              Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                  Text(
+                    text = "Live TV & 24/7 Channels",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                  )
+                  Spacer(modifier = Modifier.width(6.dp))
+                  Box(
+                    modifier = Modifier
+                      .clip(RoundedCornerShape(4.dp))
+                      .background(Color(0xFFE50914))
+                      .padding(horizontal = 4.dp, vertical = 1.dp)
+                  ) {
+                    Text(
+                      text = "● ON AIR",
+                      fontSize = 8.sp,
+                      fontWeight = FontWeight.Black,
+                      color = Color.White
+                    )
+                  }
+                }
+                Text(
+                  text = "Watch Sky News, Red Bull Sports, Bloomberg, NASA TV & regional channels",
+                  fontSize = 10.sp,
+                  color = Color(0xFFA0A7B8),
+                  maxLines = 1
+                )
+              }
+            }
+            Text(
+              text = "WATCH",
+              fontSize = 11.sp,
+              fontWeight = FontWeight.ExtraBold,
+              color = Color(0xFFE50914)
+            )
+          }
+        }
+      }
+    }
+
+    // Regional VPN Unlocked Exclusives Shelf (when connected)
+    val unlockedExclusives = items.filter { it.vpnRequired }
+    if (unlockedExclusives.isNotEmpty() && searchQuery.isBlank()) {
+      item {
+        Column(modifier = Modifier.padding(top = 10.dp)) {
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(horizontal = 16.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              Text(
+                text = "${vpnState?.server?.flagEmoji ?: "🌐"} ${vpnState?.server?.countryName ?: "Regional"} Exclusives",
+                color = Color(0xFF00D1B2),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+              )
+              Spacer(modifier = Modifier.width(6.dp))
+              Box(
+                modifier = Modifier
+                  .clip(RoundedCornerShape(4.dp))
+                  .background(Color(0xFF0A4F48))
+                  .padding(horizontal = 5.dp, vertical = 2.dp)
+              ) {
+                Text(
+                  text = "SURFSHARK UNLOCKED",
+                  fontSize = 8.sp,
+                  fontWeight = FontWeight.ExtraBold,
+                  color = Color(0xFF00D1B2)
+                )
+              }
+            }
+            Text(
+              text = "${unlockedExclusives.size} titles",
+              color = Color(0xFFA0A7B8),
+              fontSize = 11.sp
+            )
+          }
+
+          LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+          ) {
+            items(unlockedExclusives, key = { it.id }) { media ->
+              MediaCard(
+                mediaItem = media,
+                isSavedInWatchlist = watchlistIds.contains(media.id),
+                onWatchlistToggle = { onWatchlistToggle(media) },
+                onClick = { onItemClick(media) },
+                isVip = isVip
+              )
+            }
+          }
+        }
+      }
+    }
+
+    // Regional Live TV Channels Shelf (when VPN connected)
+    if (vpnState?.status == VpnStatus.CONNECTED && searchQuery.isBlank()) {
+      if (countryLiveChannels.isNotEmpty()) {
+        item {
+          Column(modifier = Modifier.padding(top = 10.dp)) {
+            Row(
+              modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+              horizontalArrangement = Arrangement.SpaceBetween,
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                  text = "${vpnState.server.flagEmoji} ${vpnState.server.countryName} Live TV",
+                  color = Color.White,
+                  fontSize = 16.sp,
+                  fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Box(
+                  modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFFE50914))
+                    .padding(horizontal = 5.dp, vertical = 2.dp)
+                ) {
+                  Text(
+                    text = "● ON AIR",
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White
+                  )
+                }
+              }
+              Text(
+                text = "${countryLiveChannels.size} channels",
+                color = Color(0xFFA0A7B8),
+                fontSize = 11.sp
+              )
+            }
+
+            LazyRow(
+              contentPadding = PaddingValues(horizontal = 16.dp),
+              horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+              items(countryLiveChannels, key = { it.id }) { channel ->
+                androidx.compose.material3.Card(
+                  modifier = Modifier
+                    .width(160.dp)
+                    .clickable { onChannelClick(channel) }
+                    .testTag("explore_live_channel_${channel.id}"),
+                  shape = RoundedCornerShape(12.dp),
+                  colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = SurfaceDark),
+                  border = BorderStroke(1.dp, BorderSubtle)
+                ) {
+                  Column {
+                    Box(modifier = Modifier.height(90.dp).fillMaxWidth()) {
+                      AsyncImage(
+                        model = channel.logoUrl,
+                        contentDescription = channel.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                      )
+                      Box(
+                        modifier = Modifier
+                          .align(Alignment.TopStart)
+                          .padding(4.dp)
+                          .clip(RoundedCornerShape(4.dp))
+                          .background(Color(0xFFE50914))
+                          .padding(horizontal = 4.dp, vertical = 2.dp)
+                      ) {
+                        Text(
+                          text = "● LIVE",
+                          fontSize = 8.sp,
+                          color = Color.White,
+                          fontWeight = FontWeight.Black
+                        )
+                      }
+                      Box(
+                        modifier = Modifier
+                          .align(Alignment.BottomEnd)
+                          .padding(4.dp)
+                          .clip(RoundedCornerShape(4.dp))
+                          .background(Color.Black.copy(alpha = 0.7f))
+                          .padding(horizontal = 4.dp, vertical = 2.dp)
+                      ) {
+                        Text(
+                          text = channel.resolution,
+                          fontSize = 8.sp,
+                          color = Color(0xFF00D1B2),
+                          fontWeight = FontWeight.Bold
+                        )
+                      }
+                    }
+                    Column(modifier = Modifier.padding(8.dp)) {
+                      Text(
+                        text = channel.name,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1
+                      )
+                      Text(
+                        text = channel.currentProgram.title,
+                        fontSize = 10.sp,
+                        color = Color(0xFFA0A7B8),
+                        maxLines = 1
+                      )
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Regional Videos & Highlights Shelf (when VPN connected)
+      if (countryVideos.isNotEmpty()) {
+        item {
+          Column(modifier = Modifier.padding(top = 10.dp)) {
+            Row(
+              modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+              horizontalArrangement = Arrangement.SpaceBetween,
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                  text = "▶️ ${vpnState.server.countryName} Videos & Trailers",
+                  color = Color.White,
+                  fontSize = 16.sp,
+                  fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Box(
+                  modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFF00D1B2).copy(alpha = 0.2f))
+                    .padding(horizontal = 5.dp, vertical = 2.dp)
+                ) {
+                  Text(
+                    text = "AI READY",
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF00D1B2)
+                  )
+                }
+              }
+              Text(
+                text = "${countryVideos.size} videos",
+                color = Color(0xFFA0A7B8),
+                fontSize = 11.sp
+              )
+            }
+
+            LazyRow(
+              contentPadding = PaddingValues(horizontal = 16.dp),
+              horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+              items(countryVideos, key = { it.title }) { video ->
+                androidx.compose.material3.Card(
+                  modifier = Modifier
+                    .width(180.dp)
+                    .clickable { onVideoClick(video) }
+                    .testTag("explore_video_${video.title.hashCode()}"),
+                  shape = RoundedCornerShape(12.dp),
+                  colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = SurfaceDark),
+                  border = BorderStroke(1.dp, BorderSubtle)
+                ) {
+                  Column(modifier = Modifier.padding(10.dp)) {
+                    Row(
+                      modifier = Modifier.fillMaxWidth(),
+                      horizontalArrangement = Arrangement.SpaceBetween,
+                      verticalAlignment = Alignment.CenterVertically
+                    ) {
+                      Box(
+                        modifier = Modifier
+                          .clip(RoundedCornerShape(4.dp))
+                          .background(Color(0xFF00D1B2).copy(alpha = 0.2f))
+                          .padding(horizontal = 5.dp, vertical = 2.dp)
+                      ) {
+                        Text(
+                          text = video.platform.displayName,
+                          fontSize = 8.sp,
+                          color = Color(0xFF00D1B2),
+                          fontWeight = FontWeight.Bold
+                        )
+                      }
+                      Text(
+                        text = video.duration,
+                        fontSize = 9.sp,
+                        color = Color(0xFFA0A7B8)
+                      )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                      text = video.title,
+                      fontSize = 12.sp,
+                      fontWeight = FontWeight.Bold,
+                      color = Color.White,
+                      maxLines = 2,
+                      lineHeight = 16.sp
+                    )
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
 
     // Featured Hero Banner (if not searching)

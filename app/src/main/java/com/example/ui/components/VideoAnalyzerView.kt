@@ -80,6 +80,7 @@ fun VideoAnalyzerView(
   onSetCustomUrl: (String) -> Unit,
   onSetCustomTitle: (String) -> Unit,
   onAnalyze: (customPrompt: String?) -> Unit,
+  availableTrailers: List<CuratedTrailer> = OttCatalog.curatedTrailers,
   modifier: Modifier = Modifier
 ) {
   val context = LocalContext.current
@@ -162,7 +163,7 @@ fun VideoAnalyzerView(
           .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
       ) {
-        OttCatalog.curatedTrailers.forEach { trailer ->
+        availableTrailers.forEach { trailer ->
           val isSelected = trailer.title == selectedTrailer.title
           Card(
             modifier = Modifier

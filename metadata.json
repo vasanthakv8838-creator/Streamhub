@@ -1,6 +1,6 @@
 {
   "name": "OTT Aggregator",
-  "description": "Unified OTT aggregator with global movie & TV search across YouTube, JioHotstar, Apple TV+, Netflix, ZEE5, Sony LIV, and Prime Video with AI discovery.",
+  "description": "Unified OTT streaming aggregator with dedicated 24/7 Live TV channels and built-in Surfshark VPN location changer to unlock regional movies, shows, and live broadcasts.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

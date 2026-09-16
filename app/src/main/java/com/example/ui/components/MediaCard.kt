@@ -130,6 +130,22 @@ fun MediaCard(
             )
           }
         }
+
+        if (mediaItem.vpnRequired && mediaItem.vpnRegionBadge.isNotBlank()) {
+          Box(
+            modifier = Modifier
+              .clip(RoundedCornerShape(6.dp))
+              .background(Color(0xFF00D1B2))
+              .padding(horizontal = 5.dp, vertical = 2.dp)
+          ) {
+            Text(
+              text = mediaItem.vpnRegionBadge,
+              color = Color.Black,
+              fontSize = 9.sp,
+              fontWeight = FontWeight.ExtraBold
+            )
+          }
+        }
       }
 
       // Bookmark button (Top Right)

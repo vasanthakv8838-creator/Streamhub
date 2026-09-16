@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.CardMembership
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,8 +58,10 @@ fun OttHeader(
   modifier: Modifier = Modifier,
   userProfile: UserProfile? = null,
   activeProfile: StreamProfile? = null,
+  vpnState: com.example.model.VpnConnectionState? = null,
   onProfileClick: () -> Unit = {},
-  onPlansClick: () -> Unit = {}
+  onPlansClick: () -> Unit = {},
+  onVpnClick: () -> Unit = {}
 ) {
   Column(
     modifier = modifier
@@ -148,6 +151,33 @@ fun OttHeader(
               imageVector = Icons.Default.VideoLibrary,
               contentDescription = "Video Analyzer",
               tint = AccentPurple,
+              modifier = Modifier.size(20.dp)
+            )
+          }
+        }
+
+        // Surfshark VPN Quick Controller Shortcut
+        val isVpnConnected = vpnState?.status == com.example.model.VpnStatus.CONNECTED
+        Surface(
+          onClick = onVpnClick,
+          shape = CircleShape,
+          color = if (isVpnConnected) Color(0xFF00D1B2) else SurfaceElevated,
+          border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (isVpnConnected) Color(0xFF00D1B2) else BorderSubtle
+          ),
+          modifier = Modifier.testTag("header_vpn_button")
+        ) {
+          Box(
+            modifier = Modifier
+              .size(38.dp)
+              .padding(2.dp),
+            contentAlignment = Alignment.Center
+          ) {
+            Icon(
+              imageVector = Icons.Default.Security,
+              contentDescription = "Surfshark VPN",
+              tint = if (isVpnConnected) Color.Black else Color(0xFF00D1B2),
               modifier = Modifier.size(20.dp)
             )
           }

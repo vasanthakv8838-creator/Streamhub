@@ -4,11 +4,16 @@ import android.app.Application
 import android.speech.tts.TextToSpeech
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.CountryAccessLibrary
+import com.example.data.LiveTvCatalog
 import com.example.data.OttCatalog
+import com.example.data.RegionalCatalog
 import com.example.data.UserSessionManager
 import com.example.data.db.AppDatabase
 import com.example.data.gemini.GeminiService
 import com.example.model.CuratedTrailer
+import com.example.model.LiveCategory
+import com.example.model.LiveChannel
 import com.example.model.MediaItem
 import com.example.model.MediaType
 import com.example.model.OttPlatform
@@ -16,12 +21,16 @@ import com.example.model.StreamProfile
 import com.example.model.UserProfile
 import com.example.model.VideoAnalysisResult
 import com.example.model.VoiceConversationMessage
+import com.example.model.VpnConnectionState
+import com.example.model.VpnServer
+import com.example.model.VpnStatus
 import com.example.model.WatchlistEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -91,13 +100,44 @@ class OttViewModel(application: Application) : AndroidViewModel(application) {
   val watchlistIds: StateFlow<List<String>> = watchlistDao.getAllWatchlistIds()
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-  // Filtered Catalog Items
+  // Surfshark VPN State
+  private val defaultVpnServer = RegionalCatalog.regionalServers.first()
+  private val _vpnState = MutableStateFlow(
+    VpnConnectionState(
+      status = VpnStatus.DISCONNECTED,
+      server = defaultVpnServer,
+      assignedVirtualIp = "",
+      uptimeSeconds = 0L,
+      downloadedMb = 0f
+    )
+  )
+  val vpnState: StateFlow<VpnConnectionState> = _vpnState.asStateFlow()
+  val availableVpnServers: List<VpnServer> = RegionalCatalog.regionalServers
+
+  // Full Country Content Package (Movies, TV Shows, Live TV, Videos) for the active VPN country
+  val countryAccessPackage: StateFlow<CountryAccessLibrary> = _vpnState.map { vpn ->
+    RegionalCatalog.getCountryAccessLibrary(vpn.server.countryCode)
+  }.stateIn(
+    viewModelScope,
+    SharingStarted.WhileSubscribed(5000),
+    RegionalCatalog.getCountryAccessLibrary(defaultVpnServer.countryCode)
+  )
+
+  // Filtered Catalog Items: Dynamically injects regional exclusives when Surfshark VPN is connected!
   val filteredItems: StateFlow<List<MediaItem>> = combine(
     _selectedPlatform,
     _selectedMediaType,
-    _searchQuery
-  ) { platform, mediaType, query ->
-    OttCatalog.items.filter { item ->
+    _searchQuery,
+    _vpnState
+  ) { platform, mediaType, query, vpn ->
+    val baseList = if (vpn.status == VpnStatus.CONNECTED) {
+      val regionalPkg = RegionalCatalog.getCountryAccessLibrary(vpn.server.countryCode)
+      regionalPkg.allMediaItems + OttCatalog.items
+    } else {
+      OttCatalog.items
+    }
+
+    baseList.filter { item ->
       val matchesPlatform = platform == OttPlatform.ALL || item.platform == platform
       val matchesType = mediaType == MediaType.ALL || item.mediaType == mediaType
       val matchesQuery = query.isBlank() ||
@@ -105,11 +145,40 @@ class OttViewModel(application: Application) : AndroidViewModel(application) {
           item.genre.contains(query, ignoreCase = true) ||
           item.cast.any { it.contains(query, ignoreCase = true) } ||
           item.director.contains(query, ignoreCase = true) ||
-          item.platform.displayName.contains(query, ignoreCase = true)
+          item.platform.displayName.contains(query, ignoreCase = true) ||
+          item.vpnRegionBadge.contains(query, ignoreCase = true)
 
       matchesPlatform && matchesType && matchesQuery
     }
   }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), OttCatalog.items)
+
+  // Live TV State
+  private val _selectedLiveCategory = MutableStateFlow(LiveCategory.ALL)
+  val selectedLiveCategory: StateFlow<LiveCategory> = _selectedLiveCategory.asStateFlow()
+
+  private val _liveSearchQuery = MutableStateFlow("")
+  val liveSearchQuery: StateFlow<String> = _liveSearchQuery.asStateFlow()
+
+  private val _selectedLiveChannel = MutableStateFlow<LiveChannel?>(null)
+  val selectedLiveChannel: StateFlow<LiveChannel?> = _selectedLiveChannel.asStateFlow()
+
+  val liveChannels: StateFlow<List<LiveChannel>> = combine(
+    _selectedLiveCategory,
+    _liveSearchQuery,
+    _vpnState
+  ) { category, query, vpn ->
+    val country = if (vpn.status == VpnStatus.CONNECTED) vpn.server.countryCode else "GLOBAL"
+    val baseList = LiveTvCatalog.getChannelsForRegion(country)
+
+    baseList.filter { channel ->
+      val matchesCategory = category == LiveCategory.ALL || channel.category == category
+      val matchesQuery = query.isBlank() ||
+          channel.name.contains(query, ignoreCase = true) ||
+          channel.network.contains(query, ignoreCase = true) ||
+          channel.currentProgram.title.contains(query, ignoreCase = true)
+      matchesCategory && matchesQuery
+    }
+  }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LiveTvCatalog.channels)
 
   // Voice AI Assistant State (gemini-3.1-flash-live-preview)
   private val _voiceMessages = MutableStateFlow<List<VoiceConversationMessage>>(
@@ -133,6 +202,15 @@ class OttViewModel(application: Application) : AndroidViewModel(application) {
   // Video Analyzer State (gemini-3.1-pro-preview)
   private val _selectedTrailer = MutableStateFlow<CuratedTrailer>(OttCatalog.curatedTrailers.first())
   val selectedTrailer: StateFlow<CuratedTrailer> = _selectedTrailer.asStateFlow()
+
+  val availableTrailers: StateFlow<List<CuratedTrailer>> = _vpnState.map { vpn ->
+    val countryVideos = RegionalCatalog.getVideosForRegion(vpn.server.countryCode)
+    if (vpn.status == VpnStatus.CONNECTED) {
+      countryVideos + OttCatalog.curatedTrailers
+    } else {
+      OttCatalog.curatedTrailers
+    }
+  }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), OttCatalog.curatedTrailers)
 
   private val _customVideoUrl = MutableStateFlow("")
   val customVideoUrl: StateFlow<String> = _customVideoUrl.asStateFlow()
@@ -375,6 +453,80 @@ class OttViewModel(application: Application) : AndroidViewModel(application) {
       _videoAnalysisResult.value = result
       _isVideoAnalyzing.value = false
     }
+  }
+
+  // Surfshark VPN Actions
+  fun connectVpn() {
+    viewModelScope.launch {
+      _vpnState.value = _vpnState.value.copy(status = VpnStatus.CONNECTING)
+      kotlinx.coroutines.delay(1000)
+      val current = _vpnState.value
+      _vpnState.value = current.copy(
+        status = VpnStatus.CONNECTED,
+        assignedVirtualIp = current.server.ipAddress,
+        uptimeSeconds = 18L,
+        downloadedMb = 48.2f
+      )
+    }
+  }
+
+  fun disconnectVpn() {
+    _vpnState.value = _vpnState.value.copy(
+      status = VpnStatus.DISCONNECTED,
+      assignedVirtualIp = "",
+      uptimeSeconds = 0L
+    )
+  }
+
+  fun switchVpnServer(newServer: VpnServer) {
+    _vpnState.value = _vpnState.value.copy(
+      status = VpnStatus.CONNECTED,
+      server = newServer,
+      assignedVirtualIp = newServer.ipAddress,
+      uptimeSeconds = 1L,
+      downloadedMb = 14.8f
+    )
+    val countryVideos = RegionalCatalog.getVideosForRegion(newServer.countryCode)
+    if (countryVideos.isNotEmpty()) {
+      selectTrailer(countryVideos.first())
+    }
+  }
+
+  fun openTrailer(trailer: CuratedTrailer) {
+    selectTrailer(trailer)
+    selectTab(6) // Navigate to Video Analyzer
+  }
+
+  fun openCountryLiveChannel(channel: LiveChannel) {
+    openLiveChannel(channel)
+    selectTab(1) // Navigate to Live TV
+  }
+
+  fun toggleCleanWeb() {
+    val current = _vpnState.value
+    _vpnState.value = current.copy(cleanWebEnabled = !current.cleanWebEnabled)
+  }
+
+  fun toggleKillSwitch() {
+    val current = _vpnState.value
+    _vpnState.value = current.copy(killSwitchEnabled = !current.killSwitchEnabled)
+  }
+
+  // Live TV Actions
+  fun selectLiveCategory(category: LiveCategory) {
+    _selectedLiveCategory.value = category
+  }
+
+  fun setLiveSearchQuery(query: String) {
+    _liveSearchQuery.value = query
+  }
+
+  fun openLiveChannel(channel: LiveChannel) {
+    _selectedLiveChannel.value = channel
+  }
+
+  fun closeLiveChannel() {
+    _selectedLiveChannel.value = null
   }
 
   override fun onCleared() {

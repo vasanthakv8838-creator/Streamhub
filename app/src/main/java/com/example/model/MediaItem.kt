@@ -20,5 +20,8 @@ data class MediaItem(
   val qualityBadge: String = "4K Ultra HD • HDR10+",
   val contentAdvisory: String = "U/A 16+",
   val isTrending: Boolean = false,
-  val isFeaturedHero: Boolean = false
+  val isFeaturedHero: Boolean = false,
+  val regionCode: String = "GLOBAL",
+  val vpnRequired: Boolean = false,
+  val vpnRegionBadge: String = ""
 )
