@@ -453,6 +453,7 @@ class GeminiService {
           OttPlatform.SONY_LIV -> "https://www.sonyliv.com/search/$encodedTitle"
           OttPlatform.ZEE5 -> "https://www.zee5.com/search?q=$encodedTitle"
           OttPlatform.YOUTUBE -> "https://www.youtube.com/results?search_query=$encodedTitle"
+          OttPlatform.THEATRE -> "https://in.bookmyshow.com/explore/movies?search=$encodedTitle"
           OttPlatform.ALL -> "https://www.google.com/search?q=watch+$encodedTitle+online"
         }
 
@@ -516,6 +517,7 @@ class GeminiService {
       OttPlatform.SONY_LIV -> "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80"
       OttPlatform.ZEE5 -> "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=600&auto=format&fit=crop&q=80"
       OttPlatform.YOUTUBE -> "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=600&auto=format&fit=crop&q=80"
+      OttPlatform.THEATRE -> "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80"
       OttPlatform.ALL -> "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80"
     }
   }

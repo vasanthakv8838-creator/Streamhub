@@ -248,7 +248,7 @@ fun SearchScreenContent(
         ) {
           item {
             PlatformFilterPill(
-              title = "All Apps (7)",
+              title = "All (8)",
               isSelected = selectedPlatform == OttPlatform.ALL,
               brandColor = AccentGold,
               onClick = { onPlatformSelect(OttPlatform.ALL) },
@@ -258,6 +258,7 @@ fun SearchScreenContent(
 
           items(
             listOf(
+              OttPlatform.THEATRE,
               OttPlatform.NETFLIX,
               OttPlatform.PRIME_VIDEO,
               OttPlatform.JIO_HOTSTAR,

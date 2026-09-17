@@ -47,6 +47,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -1025,9 +1026,78 @@ fun ExploreFeedView(
       }
     }
 
-    // Section 2: Dedicated Shelf for EACH of the 7 OTT Apps (when browsing All)
+    // Section 1.5: Dedicated Shelf for Only in Theatres Movies (Cinema Exclusives)
+    val theatricalOnlyList = items.filter { it.isInTheatresOnly }
+    if (theatricalOnlyList.isNotEmpty() && searchQuery.isBlank() && (selectedPlatform == OttPlatform.ALL || selectedPlatform == OttPlatform.THEATRE)) {
+      item {
+        Column(modifier = Modifier.padding(top = 16.dp)) {
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(horizontal = 16.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              Text(
+                text = "🍿 Only in Theatres",
+                color = Color(0xFFFF2A55),
+                fontSize = 17.sp,
+                fontWeight = FontWeight.ExtraBold
+              )
+              Spacer(modifier = Modifier.width(6.dp))
+              Box(
+                modifier = Modifier
+                  .clip(RoundedCornerShape(4.dp))
+                  .background(Color(0xFF380812))
+                  .padding(horizontal = 6.dp, vertical = 2.dp)
+              ) {
+                Text(
+                  text = "CINEMA EXCLUSIVES",
+                  fontSize = 8.sp,
+                  fontWeight = FontWeight.ExtraBold,
+                  color = Color(0xFFFF4B6E)
+                )
+              }
+            }
+            TextButton(
+              onClick = {
+                onMediaTypeSelected(com.example.model.MediaType.THEATRICAL)
+                onPlatformSelected(OttPlatform.THEATRE)
+              },
+              contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+            ) {
+              Text(
+                text = "See All (${theatricalOnlyList.size}) ›",
+                color = Color(0xFFFF4B6E),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+              )
+            }
+          }
+
+          LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+          ) {
+            items(theatricalOnlyList, key = { it.id }) { media ->
+              MediaCard(
+                mediaItem = media,
+                isSavedInWatchlist = watchlistIds.contains(media.id),
+                onWatchlistToggle = { onWatchlistToggle(media) },
+                onClick = { onItemClick(media) },
+                isVip = isVip
+              )
+            }
+          }
+        }
+      }
+    }
+
+    // Section 2: Dedicated Shelf for EACH of the OTT Apps & Theatres (when browsing All)
     if (selectedPlatform == OttPlatform.ALL && searchQuery.isBlank() && selectedMediaType == com.example.model.MediaType.ALL) {
       val platformShelves = listOf(
+        Pair(OttPlatform.THEATRE, "🍿 In Theatres Now (Cinema Only)"),
         Pair(OttPlatform.NETFLIX, "🎬 Netflix Originals & Global Hits"),
         Pair(OttPlatform.PRIME_VIDEO, "📦 Amazon Prime Video Exclusives"),
         Pair(OttPlatform.JIO_HOTSTAR, "🌟 JioHotstar Blockbusters & Sports"),

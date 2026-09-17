@@ -23,5 +23,9 @@ data class MediaItem(
   val isFeaturedHero: Boolean = false,
   val regionCode: String = "GLOBAL",
   val vpnRequired: Boolean = false,
-  val vpnRegionBadge: String = ""
+  val vpnRegionBadge: String = "",
+  val isInTheatresOnly: Boolean = false,
+  val theatreReleaseDate: String = "",
+  val cinemaFormats: String = "IMAX 3D • 4DX • Dolby Cinema",
+  val ticketBookingUrl: String = "https://in.bookmyshow.com"
 )

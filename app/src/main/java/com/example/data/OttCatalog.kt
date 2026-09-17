@@ -6,7 +6,9 @@ import com.example.model.OttPlatform
 
 object OttCatalog {
 
-  val items: List<MediaItem> = listOf(
+  val theatricalMovies: List<MediaItem> get() = TheatricalCatalog.theatricalMovies
+
+  val items: List<MediaItem> = TheatricalCatalog.theatricalMovies + listOf(
     // --- NETFLIX ---
     MediaItem(
       id = "nflx_stranger_things",

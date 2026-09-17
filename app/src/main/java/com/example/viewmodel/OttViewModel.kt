@@ -8,6 +8,7 @@ import com.example.data.CountryAccessLibrary
 import com.example.data.LiveTvCatalog
 import com.example.data.OttCatalog
 import com.example.data.RegionalCatalog
+import com.example.data.TheatricalCatalog
 import com.example.data.UserSessionManager
 import com.example.data.db.AppDatabase
 import com.example.data.gemini.GeminiService
@@ -138,19 +139,39 @@ class OttViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     baseList.filter { item ->
-      val matchesPlatform = platform == OttPlatform.ALL || item.platform == platform
-      val matchesType = mediaType == MediaType.ALL || item.mediaType == mediaType
+      val matchesPlatform = platform == OttPlatform.ALL ||
+          item.platform == platform ||
+          (platform == OttPlatform.THEATRE && item.isInTheatresOnly)
+
+      val matchesType = when (mediaType) {
+        MediaType.ALL -> true
+        MediaType.THEATRICAL -> item.isInTheatresOnly
+        MediaType.MOVIE -> item.mediaType == MediaType.MOVIE || item.isInTheatresOnly
+        else -> item.mediaType == mediaType
+      }
+
       val matchesQuery = query.isBlank() ||
           item.title.contains(query, ignoreCase = true) ||
           item.genre.contains(query, ignoreCase = true) ||
           item.cast.any { it.contains(query, ignoreCase = true) } ||
           item.director.contains(query, ignoreCase = true) ||
           item.platform.displayName.contains(query, ignoreCase = true) ||
-          item.vpnRegionBadge.contains(query, ignoreCase = true)
+          item.vpnRegionBadge.contains(query, ignoreCase = true) ||
+          item.cinemaFormats.contains(query, ignoreCase = true) ||
+          item.theatreReleaseDate.contains(query, ignoreCase = true) ||
+          (item.isInTheatresOnly && (query.contains("theatre", ignoreCase = true) || query.contains("cinema", ignoreCase = true)))
 
       matchesPlatform && matchesType && matchesQuery
     }
   }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), OttCatalog.items)
+
+  val theatricalMovies: List<MediaItem> = TheatricalCatalog.theatricalMovies
+
+  fun filterToTheatricalOnly() {
+    _selectedMediaType.value = MediaType.THEATRICAL
+    _selectedPlatform.value = OttPlatform.THEATRE
+    _searchQuery.value = ""
+  }
 
   // Live TV State
   private val _selectedLiveCategory = MutableStateFlow(LiveCategory.ALL)

@@ -101,18 +101,34 @@ fun MediaCard(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically
       ) {
-        Box(
-          modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(mediaItem.platform.brandColor)
-            .padding(horizontal = 6.dp, vertical = 2.dp)
-        ) {
-          Text(
-            text = mediaItem.platform.shortTag,
-            color = Color.White,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.ExtraBold
-          )
+        if (mediaItem.isInTheatresOnly) {
+          Box(
+            modifier = Modifier
+              .clip(RoundedCornerShape(6.dp))
+              .background(Color(0xFFFF2A55))
+              .padding(horizontal = 6.dp, vertical = 2.dp)
+          ) {
+            Text(
+              text = "🎟️ THEATRES",
+              color = Color.White,
+              fontSize = 9.sp,
+              fontWeight = FontWeight.ExtraBold
+            )
+          }
+        } else {
+          Box(
+            modifier = Modifier
+              .clip(RoundedCornerShape(6.dp))
+              .background(mediaItem.platform.brandColor)
+              .padding(horizontal = 6.dp, vertical = 2.dp)
+          ) {
+            Text(
+              text = mediaItem.platform.shortTag,
+              color = Color.White,
+              fontSize = 10.sp,
+              fontWeight = FontWeight.ExtraBold
+            )
+          }
         }
 
         if (isVip) {
@@ -234,11 +250,22 @@ fun MediaCard(
 
       Spacer(modifier = Modifier.height(4.dp))
 
-      Text(
-        text = mediaItem.duration,
-        color = Color(0xFF64748B),
-        fontSize = 10.sp
-      )
+      if (mediaItem.isInTheatresOnly) {
+        Text(
+          text = "🍿 ${mediaItem.cinemaFormats}",
+          color = Color(0xFFFF5277),
+          fontSize = 9.sp,
+          fontWeight = FontWeight.SemiBold,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
+        )
+      } else {
+        Text(
+          text = mediaItem.duration,
+          color = Color(0xFF64748B),
+          fontSize = 10.sp
+        )
+      }
     }
   }
 }

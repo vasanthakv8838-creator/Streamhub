@@ -272,12 +272,80 @@ fun MediaDetailBottomSheet(
           Spacer(modifier = Modifier.height(10.dp))
         }
 
-        // Main CTA: Watch on Platform Button
+        // Theatrical Exclusivity Showcase Banner
+        if (mediaItem.isInTheatresOnly) {
+          Box(
+            modifier = Modifier
+              .fillMaxWidth()
+              .clip(RoundedCornerShape(12.dp))
+              .background(Color(0xFF380812))
+              .border(1.dp, Color(0xFFFF2A55), RoundedCornerShape(12.dp))
+              .padding(12.dp)
+          ) {
+            Column {
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+              ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                  Text(text = "🍿", fontSize = 16.sp)
+                  Spacer(modifier = Modifier.width(6.dp))
+                  Text(
+                    text = "EXCLUSIVELY IN THEATRES",
+                    color = Color(0xFFFF4B6E),
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 12.sp,
+                    letterSpacing = 0.5.sp
+                  )
+                }
+                Box(
+                  modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0x33FF2A55))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                  Text(
+                    text = "Not On OTT Yet",
+                    color = Color(0xFFFFB3C1),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold
+                  )
+                }
+              }
+              Spacer(modifier = Modifier.height(6.dp))
+              Text(
+                text = "Experience in: ${mediaItem.cinemaFormats}",
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+              )
+              if (mediaItem.theatreReleaseDate.isNotBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                  text = "Release: ${mediaItem.theatreReleaseDate}",
+                  color = Color(0xFFC5CBD9),
+                  fontSize = 11.sp
+                )
+              }
+            }
+          }
+          Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        // Main CTA: Watch on Platform Button / Book Cinema Tickets
         Button(
           onClick = {
-            launchUrlIntent(context, mediaItem.watchUrl)
+            val targetUrl = if (mediaItem.isInTheatresOnly && mediaItem.ticketBookingUrl.isNotBlank()) {
+              mediaItem.ticketBookingUrl
+            } else {
+              mediaItem.watchUrl
+            }
+            launchUrlIntent(context, targetUrl)
           },
-          colors = ButtonDefaults.buttonColors(containerColor = mediaItem.platform.brandColor),
+          colors = ButtonDefaults.buttonColors(
+            containerColor = if (mediaItem.isInTheatresOnly) Color(0xFFFF2A55) else mediaItem.platform.brandColor
+          ),
           shape = RoundedCornerShape(12.dp),
           modifier = Modifier
             .fillMaxWidth()
@@ -292,9 +360,9 @@ fun MediaDetailBottomSheet(
           )
           Spacer(modifier = Modifier.width(8.dp))
           Text(
-            text = if (isVip) "Stream on ${mediaItem.platform.displayName} (VIP)" else "Watch on ${mediaItem.platform.displayName}",
+            text = if (mediaItem.isInTheatresOnly) "🎟️ Book Cinema Tickets & Showtimes" else if (isVip) "Stream on ${mediaItem.platform.displayName} (VIP)" else "Watch on ${mediaItem.platform.displayName}",
             color = Color.White,
-            fontSize = 16.sp,
+            fontSize = if (mediaItem.isInTheatresOnly) 14.sp else 16.sp,
             fontWeight = FontWeight.Bold
           )
           Spacer(modifier = Modifier.width(6.dp))

@@ -272,6 +272,7 @@ class TmdbService {
       OttPlatform.SONY_LIV -> "https://www.sonyliv.com/search/$encoded"
       OttPlatform.ZEE5 -> "https://www.zee5.com/search?q=$encoded"
       OttPlatform.YOUTUBE -> "https://www.youtube.com/results?search_query=$encoded"
+      OttPlatform.THEATRE -> "https://in.bookmyshow.com/explore/movies?search=$encoded"
       OttPlatform.ALL -> "https://www.google.com/search?q=watch+$encoded+online"
     }
   }

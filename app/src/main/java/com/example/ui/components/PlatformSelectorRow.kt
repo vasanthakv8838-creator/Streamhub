@@ -116,6 +116,7 @@ fun MediaTypeChipsRow(
     MediaType.values().forEach { type ->
       val isSelected = type == selectedType
       val isLiveCategory = type == MediaType.NEWS || type == MediaType.SPORTS
+      val isTheatrical = type == MediaType.THEATRICAL
       Box(
         modifier = Modifier
           .clip(RoundedCornerShape(12.dp))
@@ -129,7 +130,9 @@ fun MediaTypeChipsRow(
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-          if (isLiveCategory) {
+          if (isTheatrical) {
+            Text(text = "🍿", fontSize = 11.sp)
+          } else if (isLiveCategory) {
             Box(
               modifier = Modifier
                 .size(6.dp)

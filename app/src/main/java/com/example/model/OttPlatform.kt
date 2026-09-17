@@ -25,6 +25,14 @@ enum class OttPlatform(
     baseUrl = "",
     deepLinkPrefix = ""
   ),
+  THEATRE(
+    displayName = "In Theatres",
+    shortTag = "Cinemas",
+    brandColor = Color(0xFFFF2A55),
+    badgeBgColor = Color(0xFF380812),
+    baseUrl = "https://in.bookmyshow.com",
+    deepLinkPrefix = "https://in.bookmyshow.com"
+  ),
   YOUTUBE(
     displayName = "YouTube",
     shortTag = "YT",
@@ -85,6 +93,7 @@ enum class OttPlatform(
 
 enum class MediaType(val label: String) {
   ALL("All"),
+  THEATRICAL("Only in Theatres"),
   MOVIE("Movies"),
   SERIES("Series"),
   NEWS("Live News"),
