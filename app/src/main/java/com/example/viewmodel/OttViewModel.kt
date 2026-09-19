@@ -196,10 +196,13 @@ class OttViewModel(application: Application) : AndroidViewModel(application) {
       val matchesQuery = query.isBlank() ||
           channel.name.contains(query, ignoreCase = true) ||
           channel.network.contains(query, ignoreCase = true) ||
+          channel.countryName.contains(query, ignoreCase = true) ||
+          channel.countryCode.contains(query, ignoreCase = true) ||
+          channel.language.contains(query, ignoreCase = true) ||
           channel.currentProgram.title.contains(query, ignoreCase = true)
       matchesCategory && matchesQuery
     }
-  }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LiveTvCatalog.channels)
+  }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LiveTvCatalog.allWorldwideChannels)
 
   // Voice AI Assistant State (gemini-3.1-flash-live-preview)
   private val _voiceMessages = MutableStateFlow<List<VoiceConversationMessage>>(

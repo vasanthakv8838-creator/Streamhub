@@ -1129,20 +1129,8 @@ object LiveTvCatalog {
     )
   )
 
-  fun getChannelsForCountry(countryCode: String): List<LiveChannel> {
-    if (countryCode == "GLOBAL" || countryCode.isBlank()) {
-      return emptyList()
-    }
-    val existing = channels.filter { it.countryCode.equals(countryCode, ignoreCase = true) }
-    if (existing.isNotEmpty()) {
-      return existing
-    }
-    // Dynamic generation for any of the 195 sovereign countries in the world
-    val server = WorldVpnCountries.servers.firstOrNull { it.countryCode.equals(countryCode, ignoreCase = true) }
-    val name = server?.countryName ?: countryCode
-    val flag = server?.flagEmoji ?: "🌐"
+  fun generateCountryChannels(countryCode: String, name: String, flag: String): List<LiveChannel> {
     val cleanCode = countryCode.lowercase()
-
     return listOf(
       LiveChannel(
         id = "live_${cleanCode}_nat1",
@@ -1241,12 +1229,40 @@ object LiveTvCatalog {
     )
   }
 
+  val allWorldwideChannels: List<LiveChannel> by lazy {
+    val existingIds = channels.map { it.id }.toSet()
+    val all195CountriesChannels = WorldVpnCountries.servers.flatMap { server ->
+      generateCountryChannels(server.countryCode, server.countryName, server.flagEmoji)
+    }.filter { it.id !in existingIds }
+
+    channels + all195CountriesChannels
+  }
+
+  val worldCountriesList: List<Pair<String, String>> by lazy {
+    listOf("All Countries" to "🌐") + WorldVpnCountries.servers.map { it.countryName to it.flagEmoji }
+  }
+
+  fun getChannelsForCountry(countryCode: String): List<LiveChannel> {
+    if (countryCode == "GLOBAL" || countryCode.isBlank()) {
+      return allWorldwideChannels
+    }
+    val existing = channels.filter { it.countryCode.equals(countryCode, ignoreCase = true) }
+    val server = WorldVpnCountries.servers.firstOrNull { it.countryCode.equals(countryCode, ignoreCase = true) }
+    val name = server?.countryName ?: countryCode
+    val flag = server?.flagEmoji ?: "🌐"
+    val generated = generateCountryChannels(countryCode, name, flag)
+    val existingIds = existing.map { it.id }.toSet()
+
+    return existing + generated.filter { it.id !in existingIds }
+  }
+
   fun getChannelsForRegion(countryCode: String): List<LiveChannel> {
     if (countryCode == "GLOBAL" || countryCode.isBlank()) {
-      return channels
+      return allWorldwideChannels
     }
     val local = getChannelsForCountry(countryCode)
-    val others = channels.filter { !it.countryCode.equals(countryCode, ignoreCase = true) }
+    val localIds = local.map { it.id }.toSet()
+    val others = allWorldwideChannels.filter { it.id !in localIds }
     return local + others
   }
 }

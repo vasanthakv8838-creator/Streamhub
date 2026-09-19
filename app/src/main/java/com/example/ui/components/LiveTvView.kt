@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -73,6 +74,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.data.LiveTvCatalog
 import com.example.model.LiveCategory
 import com.example.model.LiveChannel
 import com.example.model.VpnConnectionState
@@ -99,15 +101,19 @@ fun LiveTvView(
   val context = LocalContext.current
   var activeChannelForPlayback by remember { mutableStateOf<LiveChannel?>(null) }
   var selectedCountryFilter by remember { mutableStateOf("All Countries") }
+  var showCountryPickerSheet by remember { mutableStateOf(false) }
+  var countrySheetSearchQuery by remember { mutableStateOf("") }
   val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
   val filteredChannels = remember(channels, selectedCountryFilter) {
-    if (selectedCountryFilter == "All Countries") {
+    if (selectedCountryFilter == "All Countries" || selectedCountryFilter == "GLOBAL") {
       channels
     } else {
       channels.filter { channel ->
         channel.countryName.contains(selectedCountryFilter, ignoreCase = true) ||
-        channel.countryCode.equals(selectedCountryFilter, ignoreCase = true)
+        channel.countryCode.equals(selectedCountryFilter, ignoreCase = true) ||
+        selectedCountryFilter.contains(channel.countryName, ignoreCase = true) ||
+        selectedCountryFilter.contains(channel.countryCode, ignoreCase = true)
       }
     }
   }
@@ -321,6 +327,22 @@ fun LiveTvView(
           .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
       ) {
+        // Quick button to open all 195 countries picker
+        Surface(
+          onClick = { showCountryPickerSheet = true },
+          shape = RoundedCornerShape(16.dp),
+          color = Color(0xFF0C2B36),
+          border = BorderStroke(1.dp, Color(0xFF00D1B2)),
+          modifier = Modifier.testTag("open_all_countries_picker")
+        ) {
+          Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Text(text = "🌍 All 195 Countries ▾", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF00D1B2))
+          }
+        }
+
         val countryFilters = listOf(
           "All Countries" to "🌐",
           "United States" to "🇺🇸",
@@ -328,14 +350,38 @@ fun LiveTvView(
           "India" to "🇮🇳",
           "Japan" to "🇯🇵",
           "South Korea" to "🇰🇷",
-          "France" to "🇫🇷",
           "Germany" to "🇩🇪",
+          "France" to "🇫🇷",
+          "Italy" to "🇮🇹",
+          "Spain" to "🇪🇸",
+          "Brazil" to "🇧🇷",
           "Canada" to "🇨🇦",
           "Australia" to "🇦🇺",
-          "Austria" to "🇦🇹",
-          "Qatar" to "🇶🇦",
+          "Mexico" to "🇲🇽",
+          "Netherlands" to "🇳🇱",
+          "Switzerland" to "🇨🇭",
+          "Sweden" to "🇸🇪",
+          "United Arab Emirates" to "🇦🇪",
+          "Saudi Arabia" to "🇸🇦",
+          "South Africa" to "🇿🇦",
+          "Argentina" to "🇦🇷",
+          "Egypt" to "🇪🇬",
+          "Turkey" to "🇹🇷",
+          "Poland" to "🇵🇱",
+          "Greece" to "🇬🇷",
+          "Norway" to "🇳🇴",
+          "Denmark" to "🇩🇰",
+          "Ireland" to "🇮🇪",
+          "New Zealand" to "🇳🇿",
           "Singapore" to "🇸🇬",
-          "Spain" to "🇪🇸"
+          "Indonesia" to "🇮🇩",
+          "Thailand" to "🇹🇭",
+          "Vietnam" to "🇻🇳",
+          "Philippines" to "🇵🇭",
+          "Chile" to "🇨🇱",
+          "Colombia" to "🇨🇴",
+          "Austria" to "🇦🇹",
+          "Qatar" to "🇶🇦"
         )
         countryFilters.forEach { (countryName, flag) ->
           val isSelected = selectedCountryFilter == countryName
@@ -381,6 +427,42 @@ fun LiveTvView(
                 }
               }
             }
+          }
+        }
+      }
+    }
+
+    // Channel Count and Active Filter Status Bar
+    item {
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        Text(
+          text = if (selectedCountryFilter == "All Countries") {
+            "📺 ${filteredChannels.size} Live Channels Worldwide (195 Countries)"
+          } else {
+            "📺 ${filteredChannels.size} Live Channels in $selectedCountryFilter"
+          },
+          fontSize = 12.sp,
+          fontWeight = FontWeight.Bold,
+          color = AccentGold
+        )
+        if (selectedCountryFilter != "All Countries") {
+          Surface(
+            onClick = { selectedCountryFilter = "All Countries" },
+            shape = RoundedCornerShape(8.dp),
+            color = SurfaceElevated
+          ) {
+            Text(
+              text = "Show All (195 Nations)",
+              fontSize = 10.sp,
+              color = Color(0xFF00D1B2),
+              modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+            )
           }
         }
       }
@@ -600,6 +682,142 @@ fun LiveTvView(
         onClose = { activeChannelForPlayback = null },
         onOpenInExternal = { launchLiveStream(context, channel.streamUrl) }
       )
+    }
+  }
+
+  // All 195 Sovereign Countries Picker Bottom Sheet
+  if (showCountryPickerSheet) {
+    ModalBottomSheet(
+      onDismissRequest = {
+        showCountryPickerSheet = false
+        countrySheetSearchQuery = ""
+      },
+      containerColor = SurfaceDark
+    ) {
+      Column(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(horizontal = 16.dp, vertical = 8.dp)
+      ) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Column {
+            Text(
+              text = "🌍 All 195 Sovereign Countries",
+              fontSize = 18.sp,
+              fontWeight = FontWeight.ExtraBold,
+              color = Color.White
+            )
+            Text(
+              text = "Explore 600+ live national TV channels worldwide",
+              fontSize = 11.sp,
+              color = Color(0xFFA0A7B8)
+            )
+          }
+          IconButton(onClick = {
+            showCountryPickerSheet = false
+            countrySheetSearchQuery = ""
+          }) {
+            Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+          }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        OutlinedTextField(
+          value = countrySheetSearchQuery,
+          onValueChange = { countrySheetSearchQuery = it },
+          placeholder = { Text("Search 195 countries (e.g. Brazil, Japan, Kenya...)", color = Color(0xFF6E7687), fontSize = 13.sp) },
+          leadingIcon = {
+            Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = Color(0xFFA0A7B8), modifier = Modifier.size(18.dp))
+          },
+          trailingIcon = {
+            if (countrySheetSearchQuery.isNotBlank()) {
+              IconButton(onClick = { countrySheetSearchQuery = "" }) {
+                Icon(imageVector = Icons.Default.Close, contentDescription = null, tint = Color(0xFFA0A7B8), modifier = Modifier.size(16.dp))
+              }
+            }
+          },
+          singleLine = true,
+          shape = RoundedCornerShape(12.dp),
+          colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = BackgroundDark,
+            unfocusedContainerColor = BackgroundDark,
+            focusedBorderColor = Color(0xFF00D1B2),
+            unfocusedBorderColor = BorderSubtle,
+            focusedTextColor = Color.White,
+            unfocusedTextColor = Color.White
+          ),
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(50.dp)
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        val allCountries = remember { LiveTvCatalog.worldCountriesList }
+        val searchedCountries = remember(countrySheetSearchQuery, allCountries) {
+          if (countrySheetSearchQuery.isBlank()) {
+            allCountries
+          } else {
+            allCountries.filter { (name, _) ->
+              name.contains(countrySheetSearchQuery, ignoreCase = true)
+            }
+          }
+        }
+
+        LazyColumn(
+          modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 440.dp),
+          verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+          items(searchedCountries) { (countryName, flag) ->
+            val isSelected = selectedCountryFilter == countryName
+            Surface(
+              onClick = {
+                selectedCountryFilter = countryName
+                showCountryPickerSheet = false
+                countrySheetSearchQuery = ""
+              },
+              shape = RoundedCornerShape(10.dp),
+              color = if (isSelected) Color(0xFF0A4F48) else Color.Transparent,
+              modifier = Modifier.fillMaxWidth()
+            ) {
+              Row(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(horizontal = 12.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                  Text(text = flag, fontSize = 22.sp)
+                  Spacer(modifier = Modifier.width(12.dp))
+                  Text(
+                    text = countryName,
+                    fontSize = 14.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isSelected) Color(0xFF00D1B2) else Color.White
+                  )
+                }
+                if (isSelected) {
+                  Text(
+                    text = "✓ Selected",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF00D1B2)
+                  )
+                }
+              }
+            }
+          }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+      }
     }
   }
 }
